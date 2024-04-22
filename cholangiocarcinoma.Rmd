@@ -1,0 +1,586 @@
+---
+  title: "SurfR cholangiocarcinoma public datasets analysis"
+author: "Aurora Maurizio, Anna Sofia Tascini, and Marco Jacopo Morelli"
+output:
+  BiocStyle::html_document:
+  toc_float: true
+bibliography: references.bib
+vignette: >
+  %\VignetteIndexEntry{Introduction to SurfR}
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteEncoding{UTF-8}
+---
+
+  
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Install and import libraries
+```{r gene2protein }
+
+#if (!require("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+
+# The following initializes usage of Bioc devel
+#BiocManager::install(version='devel')
+
+#BiocManager::install("SurfR")
+#BiocManager::install("TCGAbiolinks")
+#devtools::install_github("auroramaurizio/SurfR")
+
+#import the libraries
+library(SurfR)
+library(stringr)
+library(openxlsx)
+```
+
+
+## Download cholangiocarcinoma GSE107943 metadata from GEO 
+```{r GEO metadata }
+
+mGSE107943 <- GEOmetadata(GSE = "GSE107943")
+
+# create new metadata column in order to remove unwanted special characters
+unwanted_character <- " "
+fx <- function(x) {
+  str_split(string = x, pattern = unwanted_character)[[1]][1]
+}
+
+mGSE107943$condition <- sapply(mGSE107943$tissue, fx)
+mGSE107943 <- as.data.frame(mGSE107943)
+mGSE107943$condition <- as.factor(mGSE107943$condition)
+
+# Preview metadata
+head(mGSE107943)
+
+```
+
+# Download cholangiocarcinoma GSE107943 count matrix from ArchS4
+
+```{r GEO countmatrix }
+cGSE107943 <- DownloadArchS4(mGSE107943$GSM,
+                             species = "human",
+                             print_tsv = FALSE,
+                             filename = NULL)
+
+# Preview count matrix
+head(cGSE107943[, ])
+
+#we have 30 tumor and 27 paracancerous adjacent livertissues
+```
+
+## Explore the GEO dataset, look for batch effects with a PCA
+```{r GEO PCA }
+
+# Plot pca
+#pdf("PCA_cGSE107943_GEO.pdf")
+SurfR::plotPCA(matrix = edgeR::cpm(cGSE107943), metadata = mGSE107943,
+               dims = c(1, 2),
+               color.by = "condition", shape.by = "condition",
+               label = FALSE, main = "PCA GSE107943")
+#dev.off()
+
+
+```
+
+
+# Perform DGE on the GEO dataset
+
+```{r GEO DGE }
+df_GEO <- DGE(expression = cGSE107943,
+              metadata = mGSE107943,
+              Nreplica = 27,
+              design = "~condition",
+              condition = "condition",
+              alpha = 0.05,
+              TEST = "Tumor", CTRL ="Liver",
+              output_tsv = FALSE)
+
+# remove NA values
+df_GEO <- df_GEO[!is.na(df_GEO$padj), ]
+
+# select only genes with a very Mean_CPM value < 0.5 in the control
+#df_GEO <- df_GEO[df_GEO$Mean_CPM_C < 0.5,]
+
+# Detect SP amoung differentially expressed genes
+fdr_GeneID <- df_GEO[df_GEO$padj < 0.05, "GeneID"]
+
+SP_GEO <- Gene2SProtein(genes = fdr_GeneID, input_type = "gene_name")
+#1008 out of 10247 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 43 out of 330 genes have a matching surface protein
+
+fdrUP_GeneID <- df_GEO[df_GEO$padj < 0.05 & df_GEO$log2FoldChange > 0, "GeneID"]
+SPup_GEO <- Gene2SProtein(genes = fdrUP_GeneID, input_type = "gene_name")
+#618 out of 5972 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 43 out of 330 genes have a matching surface protein
+
+fdrDW_GeneID <- df_GEO[df_GEO$padj < 0.05 & df_GEO$log2FoldChange < 0, "GeneID"]
+SPdw_GEO <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
+
+#390 out of 4275 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 0 genes have a matching surface protein
+```
+
+
+## Download cholangiocarcinoma dataset count matrix from TCGA
+
+```{r GEO countmatrix }
+TCGA.CHOL <- TCGA_download(project = "TCGA-CHOL")
+
+cTCGA.CHOL <- TCGA.CHOL[[1]]
+mTCGA.CHOL <- TCGA.CHOL[[2]]
+table(mTCGA.CHOL$shortLetterCode)
+
+pdf("PCA_cTCGA.CHOL.pdf")
+SurfR::plotPCA(matrix = edgeR::cpm(cTCGA.CHOL), metadata = mTCGA.CHOL,
+               dims = c(1, 2),
+               color.by = "shortLetterCode", shape.by = "shortLetterCode",
+               label = FALSE, main = "PCA TCGA.CHOL")
+dev.off()
+
+
+
+mTCGA.CHOL$shortLetterCode <- as.factor(mTCGA.CHOL$shortLetterCode)
+
+#NT 9 e TP 35
+
+```
+
+## Explore the TCGA dataset, look for batch effects with a PCA
+```{r GEO PCA }
+
+# Plot pca
+#pdf("PCA_TCGA.CHOL.pdf")
+SurfR::plotPCA(matrix = cTCGA.CHOL, metadata = mTCGA.CHOL,
+               dims = c(1, 2),
+               color.by = "shortLetterCode", shape.by = "shortLetterCode",
+               label = FALSE, main = "TCGA.CHOL")
+#dev.off()
+
+
+```
+
+## Perform DGE on the the TCGA dataset
+```{r TCGA DGE }
+
+df_TCGA <- DGE(expression = cTCGA.CHOL,
+               metadata = mTCGA.CHOL,
+               Nreplica = 9,
+               design = "~shortLetterCode",
+               condition = "shortLetterCode",
+               alpha = 0.05,
+               TEST = "TP", CTRL =  "NT",
+               output_tsv = FALSE)
+
+
+# remove NA values
+df_TCGA <- df_TCGA[!is.na(df_TCGA$padj), ]
+
+# select only genes with a very low expression in the controls
+#df_TCGA <- df_TCGA[df_TCGA$Mean_CPM_C < 0.5,]
+
+# select only genes with padj < 0.05
+fdr_GeneID <- df_TCGA[df_TCGA$padj < 0.05,
+                      "GeneID"]
+
+```
+
+
+## Identify Surface protein coding genes
+```{r TCGA DGE }
+
+SP_TCGA <- Gene2SProtein(genes = fdr_GeneID, input_type = "gene_name")
+#1006 out of 10410 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 217 out of 1974 genes have a matching surface protein
+
+fdrUP_GeneID <- df_TCGA[df_TCGA$padj < 0.05 & df_TCGA$log2FoldChange > 0,
+                        "GeneID"]
+
+length(fdrUP_GeneID)
+#6265
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 217 out of 1974 genes have a matching surface protein
+
+SPup_TCGA <- Gene2SProtein(genes = fdrUP_GeneID, input_type = "gene_name")
+#652 out of 6265 genes have a matching surface protein
+
+# select only genes with a very Mean_CPM value < 0.5 in the control
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 217 out of 1974 genes have a matching surface protein
+fdrDW_GeneID <- df_TCGA[df_TCGA$padj < 0.05 & df_TCGA$log2FoldChange < 0,
+                        "GeneID"]
+
+SPdw_TCGA <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
+#354 out of 4145 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 0
+```
+
+
+## annotate our list of genes with cross-database identifiers
+
+```{r TCGA annotate SPID }
+library(enrichR)
+annotated_TCGA <- Annotate_SPID(df_TCGA, "WikiPathway_2021_Human")
+head(annotated_TCGA, 10)
+
+write.xlsx(annotated_TCGA, "annotated_TCGA_WikiPathway_2021_Human.xlsx")
+```
+
+```{r GEO annotate SPID }
+annotated_GEO <- Annotate_SPID(df_GEO, "WikiPathway_2021_Human")
+head(annotated_GEO, 10)
+
+write.xlsx(annotated_GEO, "annotated_GEO_WikiPathway_2021_Human.xlsx")
+```
+
+
+## Perform Meta-analysis on GEO and TCGA cholangiocarcinoma datasets
+
+
+```{r Perform meta analysis }
+L_fishercomb <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
+                           test_statistic = "fishercomb",
+                           BHth = 0.05,
+                           adjpval.t = 0.05)
+
+
+L_invnorm <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
+                        test_statistic = "invnorm",
+                        BHth = 0.05,
+                        adjpval.t = 0.05,
+                        nrep = c(9, 27))
+
+
+metacomb <- combine_fisher_invnorm(ind_deg = list(df_TCGA, df_GEO),
+                                   invnorm = L_invnorm,
+                                   fishercomb = L_fishercomb,
+                                   adjpval = 0.05)
+
+
+metacomb_GeneID <- metacomb[metacomb$signFC != 0, "GeneID"]
+SP <- Gene2SProtein(genes = metacomb_GeneID, input_type = "gene_name")
+#1271 out of 12565 genes have a matching surface protein
+
+
+metacombUP_GeneID <- metacomb[metacomb$signFC == 1, "GeneID"]
+SPup <- Gene2SProtein(genes = metacombUP_GeneID, input_type = "gene_name")
+#765 out of 7179 genes have a matching surface protein
+
+
+metacombDW_GeneID <- metacomb[metacomb$signFC == -1, "GeneID"]
+SPdw <- Gene2SProtein(genes = metacombDW_GeneID, input_type = "gene_name")
+#506 out of 5386 genes have a matching surface protein
+
+```
+
+## Plot the fraction on SPCG coding for receptor, enzymes, transporters etc.
+```{r Almen classification }
+# Barplot of Almen classification
+
+
+#pdf("Almen_class_SPUP_metacomb.pdf")
+Splot(SPup,
+      group.by = "Membranome.Almen.main-class",
+      main = "Almen class Adj")
+#dev.off()
+```
+
+
+## Perform enrichment analysis on GO BP
+
+```{r Perform enrichment analysis }
+
+library(enrichR)
+library(ggplot2)
+
+dfList <- list(TCGA = as.data.frame(df_TCGA), GEO = as.data.frame(df_GEO))
+
+Enrich <- Enrichment(dfList,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+```
+
+## Plot the enrichment
+
+```{r Graphycally represent the enrichment}
+
+# barplot of the top 5 upregulated pathways in GEO
+#pdf("Enrichment_barplot_GEO_UP.pdf", 10, 5)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+#dev.off()
+```
+```{r Graphycally represent the enrichment}
+
+# barplot of the top 10 upregulated pathways in TCGA
+#pdf("Enrichment_barplot_TCGA_UP.pdf", 10, 5)
+Enrichment_barplot(Enrich$TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+#dev.off()
+```
+```{r Graphycally represent the enrichment}
+
+# barplot of the top 5 downregulated pathways in GEO
+#pdf("Enrichment_barplot_GEO_DOWN.pdf", 10, 5)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+#dev.off()
+```
+```{r Graphycally represent the enrichment}
+
+# barplot of the top 10 downregulated pathways in TCGA
+#pdf("Enrichment_barplot_TCGA_DOWN.pdf", 10, 5)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+#dev.off()
+```
+
+## Perform venn diagram
+
+```{r Perform venn diagram }
+
+S_list <- list(SPup_GEO = rownames(SPup_GEO),
+               SPup_TCGA = rownames(SPup_TCGA))
+
+#pdf("Venn_GEO_TCGA.pdf")
+SVenn(S_list,
+      cols.use = c("green", "blue"),
+      opacity = 0.5,
+      output_intersectionFile = FALSE)
+#dev.off()
+
+#save.image(file="cholangiocarcinoma.RData")
+```
+
+###############################################################
+
+# Redo everything imposing a low SPCG expression in the control
+
+###############################################################
+
+
+## Perform DGE on the the GEO dataset
+
+```{r GEO DGE }
+df_GEO <- DGE(expression = cGSE107943,
+              metadata = mGSE107943,
+              Nreplica = 27,
+              design = "~condition",
+              condition = "condition",
+              alpha = 0.05,
+              TEST = "Tumor", CTRL ="Liver",
+              output_tsv = FALSE)
+
+# remove NA values
+df_GEO <- df_GEO[!is.na(df_GEO$padj), ]
+
+# select only genes with a very Mean_CPM value < 0.5 in the control
+df_GEO <- df_GEO[df_GEO$Mean_CPM_C < 0.5,]
+
+# Detect SP amoung differentially expressed genes
+fdr_GeneID <- df_GEO[df_GEO$padj < 0.05, "GeneID"]
+
+SP_GEO <- Gene2SProtein(genes = fdr_GeneID, input_type = "gene_name")
+#1008 out of 10247 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 43 out of 330 genes have a matching surface protein
+
+fdrUP_GeneID <- df_GEO[df_GEO$padj < 0.05 & df_GEO$log2FoldChange > 0, "GeneID"]
+SPup_GEO <- Gene2SProtein(genes = fdrUP_GeneID, input_type = "gene_name")
+#618 out of 5972 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 43 out of 330 genes have a matching surface protein
+
+fdrDW_GeneID <- df_GEO[df_GEO$padj < 0.05 & df_GEO$log2FoldChange < 0, "GeneID"]
+SPdw_GEO <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
+
+#390 out of 4275 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 0 genes have a matching surface protein
+```
+
+## Perform DGE on the the TCGA dataset
+```{r TCGA DGE }
+
+df_TCGA <- DGE(expression = cTCGA.CHOL,
+               metadata = mTCGA.CHOL,
+               Nreplica = 9,
+               design = "~shortLetterCode",
+               condition = "shortLetterCode",
+               alpha = 0.05,
+               TEST = "TP", CTRL =  "NT",
+               output_tsv = FALSE)
+
+
+# remove NA values
+df_TCGA <- df_TCGA[!is.na(df_TCGA$padj), ]
+
+# select only genes with a very low expression in the controls
+df_TCGA <- df_TCGA[df_TCGA$Mean_CPM_C < 0.5,]
+
+# select only genes with padj < 0.05
+fdr_GeneID <- df_TCGA[df_TCGA$padj < 0.05,
+                      "GeneID"]
+
+## Identify Surface protein coding genes
+
+SP_TCGA <- Gene2SProtein(genes = fdr_GeneID, input_type = "gene_name")
+#1006 out of 10410 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 217 out of 1974 genes have a matching surface protein
+
+fdrUP_GeneID <- df_TCGA[df_TCGA$padj < 0.05 & df_TCGA$log2FoldChange > 0,
+                        "GeneID"]
+
+length(fdrUP_GeneID)
+#6265
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 217 out of 1974 genes have a matching surface protein
+
+SPup_TCGA <- Gene2SProtein(genes = fdrUP_GeneID, input_type = "gene_name")
+#652 out of 6265 genes have a matching surface protein
+
+# select only genes with a very Mean_CPM value < 0.5 in the control
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 217 out of 1974 genes have a matching surface protein
+fdrDW_GeneID <- df_TCGA[df_TCGA$padj < 0.05 & df_TCGA$log2FoldChange < 0,
+                        "GeneID"]
+
+SPdw_TCGA <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
+#354 out of 4145 genes have a matching surface protein
+# if we apply filter df_GEO$Mean_CPM_C < 0.5: 0
+
+
+```
+
+
+
+
+```{r Perform meta analysis }
+L_fishercomb <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
+                           test_statistic = "fishercomb",
+                           BHth = 0.05,
+                           adjpval.t = 0.05)
+
+
+L_invnorm <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
+                        test_statistic = "invnorm",
+                        BHth = 0.05,
+                        adjpval.t = 0.05,
+                        nrep = c(9, 27))
+
+
+metacomb <- combine_fisher_invnorm(ind_deg = list(df_TCGA, df_GEO),
+                                   invnorm = L_invnorm,
+                                   fishercomb = L_fishercomb,
+                                   adjpval = 0.05)
+
+
+metacomb_GeneID <- metacomb[metacomb$signFC != 0, "GeneID"]
+SP <- Gene2SProtein(genes = metacomb_GeneID, input_type = "gene_name")
+#1271 out of 12565 genes have a matching surface protein
+
+
+metacombUP_GeneID <- metacomb[metacomb$signFC == 1, "GeneID"]
+SPup <- Gene2SProtein(genes = metacombUP_GeneID, input_type = "gene_name")
+#765 out of 7179 genes have a matching surface protein
+
+# Barplot of Almen classification
+pdf("Almen_class_SPUP_metacomb.pdf")
+Splot(SPup,
+      group.by = "Membranome.Almen.main-class",
+      main = "Almen class Tumor")
+dev.off()
+
+
+metacombDW_GeneID <- metacomb[metacomb$signFC == -1, "GeneID"]
+SPdw <- Gene2SProtein(genes = metacombDW_GeneID, input_type = "gene_name")
+#506 out of 5386 genes have a matching surface protein
+
+```
+
+
+## Plot the fraction on SPCG coding for receptor, enzymes, transporters etc.
+```{r Almen classification }
+# Barplot of Almen classification
+
+#pdf("Almen_class_SPUP_metacomb.pdf")
+Splot(SPup,
+      group.by = "Membranome.Almen.main-class",
+      main = "Almen class Adj")
+#dev.off()
+```
+
+
+
+```{r Graphycally represent the enrichment}
+# barplot of the top 10 upregulated pathways in GEO
+#pdf("Enrichment_barplot_GEO_UP_filt.pdf", 10, 5)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+#dev.off()
+
+```
+
+```{r Graphycally represent the enrichment}
+# barplot of the top 10 upregulated pathways in TCGA
+#pdf("Enrichment_barplot_TCGA_UP_filt.pdf", 10, 5)
+Enrichment_barplot(Enrich$TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+#dev.off()
+```
+```{r Graphycally represent the enrichment}
+#pdf("Enrichment_barplot_GEO_DW_filt.pdf", 10, 5)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+#dev.off()
+```
+
+
+```{r Graphycally represent the enrichment}
+#pdf("Enrichment_barplot_TCGA_DW_filt.pdf", 10, 5)
+Enrichment_barplot(Enrich$TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+#dev.off()
+```
+
+## Perform venn diagram
+
+```{r Perform venn diagram }
+
+S_list <- list(SPup_GEO = rownames(SPup_GEO),
+               SPup_TCGA = rownames(SPup_TCGA))
+
+#pdf("Venn_GEO_TCGA.pdf")
+SVenn(S_list,
+      cols.use = c("green", "blue"),
+      opacity = 0.5,
+      output_intersectionFile = FALSE)
+#dev.off()
+
+#save.image(file="cholangiocarcinoma.RData")
+```
+
+
