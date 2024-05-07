@@ -126,7 +126,7 @@ SPdw_GEO <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
 ```
 
 
-## Download cholangiocarcinoma dataset count matrix from TCGA
+## Download cholangiocarcinoma dataset from TCGA
 
 ```{r GEO countmatrix }
 TCGA.CHOL <- TCGA_download(project = "TCGA-CHOL")
@@ -190,7 +190,7 @@ fdr_GeneID <- df_TCGA[df_TCGA$padj < 0.05,
 ```
 
 
-## Identify Surface protein coding genes
+## Identify Surface protein coding genes on the TCGA dataset
 ```{r TCGA DGE }
 
 SP_TCGA <- Gene2SProtein(genes = fdr_GeneID, input_type = "gene_name")
@@ -216,6 +216,226 @@ SPdw_TCGA <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
 #354 out of 4145 genes have a matching surface protein
 # if we apply filter df_GEO$Mean_CPM_C < 0.5: 0
 ```
+## Perform the enrichment to carachterize UP and DOWN regulated genes in GEO and
+## TCGA datasets
+
+```{r permorm and graphycally represent the enrichment}
+
+library(enrichR)
+library(ggplot2)
+
+head(Enrich)
+
+#SP_GEO_genes <- SP_GEO$UniProt.gene
+#df_SP_GEO_genes <- df_GEO[rownames(df_GEO) %in% SP_GEO_genes, ]
+
+#SP_TCGA_genes <- SP_TCGA$UniProt.gene
+#df_SP_TCGA_genes <- df_TCGA[rownames(df_TCGA) %in% SP_TCGA_genes, ]
+
+#head(df_SP_TCGA_genes)
+#head(df_SP_GEO_genes)
+
+
+dfList <- list(TCGA = as.data.frame(df_TCGA), GEO = as.data.frame(df_GEO))
+
+# perform the enrichment
+Enrich <- Enrichment(dfList,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+# represent the enriched pathways as a barplot
+
+pdf("Enrichment_barplot_TCGA_UP_allgenes.pdf", 10, 4)
+Enrichment_barplot(Enrich$TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+dev.off()
+
+pdf("Enrichment_barplot_TCGA_DW_allgenes.pdf", 10, 4)
+Enrichment_barplot(Enrich$TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+dev.off()
+
+
+pdf("Enrichment_barplot_GEO_UP_allgenes.pdf", 10, 4)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+dev.off()
+
+
+pdf("Enrichment_barplot_GEO_DW_allgenes.pdf", 10, 4)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+dev.off()
+```
+
+
+## perform and graphically represent the enrichment of SPCG vs non SPCG 
+## on the TCGA dataset
+```{r check }
+library(enrichR)
+
+
+SP_TCGA_genes <- SP_TCGA$UniProt.gene
+NSP_TCGA_genes <- df_TCGA$GeneID[!df_TCGA$GeneID %in% SP_TCGA_genes] 
+
+
+df_SP_TCGA_genes <- df_TCGA[rownames(df_TCGA) %in% SP_TCGA_genes, ]
+df_NSP_TCGA_genes <- df_TCGA[rownames(df_TCGA) %in% NSP_TCGA_genes, ]
+
+head(df_SP_TCGA_genes)
+head(df_NSP_TCGA_genes)
+
+#dfList <- list(SP_TCGA = as.data.frame(df_SP_TCGA_genes), NSP_TCGA = as.data.frame(df_NSP_TCGA_genes))
+
+dfListSP_TCGA <- list(SP_TCGA = as.data.frame(df_SP_TCGA_genes)) 
+               
+dfListNSP_TCGA <- list(NSP_TCGA = as.data.frame(df_NSP_TCGA_genes))
+
+Enrich_TCGA_CC <- Enrichment(dfListSP_TCGA,
+                     enrich.databases = c("GO_Cellular_Component_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+Enrich_TCGA_BP <- Enrichment(dfListSP_TCGA,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+# cellular component
+pdf("Enrich_SPvs_nSP_UP_TCGA_CC.pdf",10,4)
+SPvs_nSP_UP_TGCA_CC <- Enrichment_barplot(Enrich_TCGA_CC$SP_TCGA,
+                   enrich.databases <- c("GO_Cellular_Component_2021"),
+                   p_adj = 0.05,
+                   num_term = 10)
+print(SPvs_nSP_UP_TGCA_CC +ggtitle("SP - TCGA CC")) 
+dev.off()
+
+# biological process
+pdf("Enrich_SPvs_nSP_UP_TCGA_BP.pdf",10,4)
+SPvs_nSP_UP_TGCA_BP <- Enrichment_barplot(Enrich_TCGA_BP$SP_TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10)
+print(SPvs_nSP_UP_TGCA_BP +ggtitle("SP - TCGA BP")) 
+dev.off()
+                   
+
+Enrich_TCGA_CC_nsp <- Enrichment(dfListNSP_TCGA,
+                     enrich.databases = c("GO_Cellular_Component_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+Enrich_TCGA_BP_nsp <- Enrichment(dfListNSP_TCGA,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+library(enrichR)
+pdf("Enrich_SPvs_nSP_DOWN_TCGA_CC.pdf",10,4)
+SPvs_nSP_UP_TGCA_CC <- Enrichment_barplot(Enrich_TCGA_CC_nsp$NSP_TCGA,
+                   enrich.databases <- c("GO_Cellular_Component_2021"),
+                   p_adj = 0.05,
+                   num_term = 10)
+print(SPvs_nSP_UP_TGCA_CC +ggtitle("nSP - TCGA CC")) 
+dev.off()
+
+library(enrichR)
+pdf("Enrich_SPvs_nSP_DOWN_TCGA_BP.pdf",10,4)
+SPvs_nSP_UP_TGCA_BP <- Enrichment_barplot(Enrich_TCGA_BP_nsp$NSP_TCGA,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10)
+print(SPvs_nSP_UP_TGCA_BP +ggtitle("nSP - TCGA BP")) 
+dev.off()
+                   
+```
+
+## perform and graphically represent the enrichment of SPCG vs non SPCG 
+## on the TCGA dataset
+
+```{r }
+
+library(enrichR)
+
+SP_GEO_genes <- SP_GEO$UniProt.gene
+NSP_GEO_genes <- df_GEO$GeneID[!df_GEO$GeneID %in% SP_GEO_genes] 
+
+df_SP_GEO_genes <- df_GEO[rownames(df_GEO) %in% SP_GEO_genes, ]
+df_NSP_GEO_genes <- df_GEO[rownames(df_GEO) %in% NSP_GEO_genes, ]
+
+#dfList <- list(SP_GEO = as.data.frame(df_SP_GEO_genes), NSP_GEO = as.data.frame(df_NSP_GEO_genes))
+
+dfListSP_GEO <- list(SP_GEO = as.data.frame(df_SP_GEO_genes)) 
+
+dfListNSP_GEO <- list(NSP_GEO = as.data.frame(df_NSP_GEO_genes))
+
+
+Enrich_GEO_CC <- Enrichment(dfListSP_GEO,
+                             enrich.databases = c("GO_Cellular_Component_2021"),
+                             p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+Enrich_GEO_BP <- Enrichment(dfListSP_GEO,
+                             enrich.databases = c("GO_Biological_Process_2021"),
+                             p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+pdf("Enrich_SPvs_nSP_UP_GEO_CC.pdf",10,4)
+SPvs_nSP_UP_TGCA_CC <- Enrichment_barplot(Enrich_GEO_CC$SP_GEO,
+                                          enrich.databases <- c("GO_Cellular_Component_2021"),
+                                          p_adj = 0.05,
+                                          num_term = 10)
+print(SPvs_nSP_UP_TGCA_CC +ggtitle("SP - GEO CC")) 
+dev.off()
+
+
+pdf("Enrich_SPvs_nSP_UP_GEO_BP.pdf",10,4)
+SPvs_nSP_UP_TGCA_BP <- Enrichment_barplot(Enrich_GEO_BP$SP_GEO,
+                                          enrich.databases <- c("GO_Biological_Process_2021"),
+                                          p_adj = 0.05,
+                                          num_term = 10)
+print(SPvs_nSP_UP_TGCA_BP +ggtitle("SP - GEO BP")) 
+dev.off()
+
+
+
+
+Enrich_GEO_CC_nsp <- Enrichment(dfListNSP_GEO,
+                                 enrich.databases = c("GO_Cellular_Component_2021"),
+                                 p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+Enrich_GEO_BP_nsp <- Enrichment(dfListNSP_GEO,
+                                 enrich.databases = c("GO_Biological_Process_2021"),
+                                 p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+library(enrichR)
+pdf("Enrich_SPvs_nSP_DOWN_GEO_CC.pdf",10,4)
+SPvs_nSP_UP_GEO_CC <- Enrichment_barplot(Enrich_GEO_CC_nsp$NSP_GEO,
+                                          enrich.databases <- c("GO_Cellular_Component_2021"),
+                                          p_adj = 0.05,
+                                          num_term = 10)
+print(SPvs_nSP_UP_GEO_CC +ggtitle("nSP - GEO CC")) 
+dev.off()
+
+library(enrichR)
+pdf("Enrich_SPvs_nSP_DOWN_GEO_BP.pdf",10,4)
+SPvs_nSP_UP_GEO_BP <- Enrichment_barplot(Enrich_GEO_BP_nsp$NSP_GEO,
+                                          enrich.databases <- c("GO_Biological_Process_2021"),
+                                          p_adj = 0.05,
+                                          num_term = 10)
+print(SPvs_nSP_UP_GEO_BP +ggtitle("nSP - GEO BP")) 
+dev.off()
+
+```
 
 
 ## annotate our list of genes with cross-database identifiers
@@ -238,17 +458,18 @@ write.xlsx(annotated_GEO, "annotated_GEO_WikiPathway_2021_Human.xlsx")
 
 ## Perform Meta-analysis on GEO and TCGA cholangiocarcinoma datasets
 
-
 ```{r Perform meta analysis }
 L_fishercomb <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
                            test_statistic = "fishercomb",
                            BHth = 0.05,
+                           plot = TRUE,
                            adjpval.t = 0.05)
 
 
 L_invnorm <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
                         test_statistic = "invnorm",
                         BHth = 0.05,
+                        plot = TRUE,
                         adjpval.t = 0.05,
                         nrep = c(9, 27))
 
@@ -309,40 +530,36 @@ Enrich <- Enrichment(dfList,
 ```{r Graphycally represent the enrichment}
 
 # barplot of the top 5 upregulated pathways in GEO
-#pdf("Enrichment_barplot_GEO_UP.pdf", 10, 5)
+#pdf("Enrichment_barplot_GEO_UP.pdf", 10, 4)
 Enrichment_barplot(Enrich$GEO,
                    enrich.databases <- c("GO_Biological_Process_2021"),
                    p_adj = 0.05,
                    num_term = 10,
                    cond = "UP")
 #dev.off()
-```
-```{r Graphycally represent the enrichment}
+
 
 # barplot of the top 10 upregulated pathways in TCGA
-#pdf("Enrichment_barplot_TCGA_UP.pdf", 10, 5)
+#pdf("Enrichment_barplot_TCGA_UP.pdf", 10, 4)
 Enrichment_barplot(Enrich$TCGA,
                    enrich.databases <- c("GO_Biological_Process_2021"),
                    p_adj = 0.05,
                    num_term = 10,
                    cond = "UP")
 #dev.off()
-```
-```{r Graphycally represent the enrichment}
+
 
 # barplot of the top 5 downregulated pathways in GEO
-#pdf("Enrichment_barplot_GEO_DOWN.pdf", 10, 5)
+#pdf("Enrichment_barplot_GEO_DOWN.pdf", 10, 4)
 Enrichment_barplot(Enrich$GEO,
                    enrich.databases <- c("GO_Biological_Process_2021"),
                    p_adj = 0.05,
                    num_term = 10,
                    cond = "DOWN")
 #dev.off()
-```
-```{r Graphycally represent the enrichment}
 
 # barplot of the top 10 downregulated pathways in TCGA
-#pdf("Enrichment_barplot_TCGA_DOWN.pdf", 10, 5)
+#pdf("Enrichment_barplot_TCGA_DOWN.pdf", 10, 4)
 Enrichment_barplot(Enrich$GEO,
                    enrich.databases <- c("GO_Biological_Process_2021"),
                    p_adj = 0.05,
@@ -351,7 +568,7 @@ Enrichment_barplot(Enrich$GEO,
 #dev.off()
 ```
 
-## Perform venn diagram
+## Perform venn diagram for GEO vs TCGA SPCG
 
 ```{r Perform venn diagram }
 
@@ -364,6 +581,24 @@ SVenn(S_list,
       opacity = 0.5,
       output_intersectionFile = FALSE)
 #dev.off()
+
+#save.image(file="cholangiocarcinoma.RData")
+```
+
+## Perform venn diagram for GEO SPCG, TCGA SPCG, and SPCG detected by meta-analysis
+
+```{r Perform venn diagram including SPCG detected with meta-analysis }
+
+S_list_meta <- list(SPup_GEO = rownames(SPup_GEO),
+               SPup_TCGA = rownames(SPup_TCGA),
+               Meta = SPup$UniProt.name)
+
+pdf("Venn_GEO_TCGA_meta_all.pdf")
+SVenn(S_list_meta,
+      cols.use = c("green", "blue","yellow"),
+      opacity = 0.5,
+      output_intersectionFile = FALSE)
+dev.off()
 
 #save.image(file="cholangiocarcinoma.RData")
 ```
@@ -393,7 +628,7 @@ df_GEO <- df_GEO[!is.na(df_GEO$padj), ]
 # select only genes with a very Mean_CPM value < 0.5 in the control
 df_GEO <- df_GEO[df_GEO$Mean_CPM_C < 0.5,]
 
-# Detect SP amoung differentially expressed genes
+# Detect SP among differentially expressed genes
 fdr_GeneID <- df_GEO[df_GEO$padj < 0.05, "GeneID"]
 
 SP_GEO <- Gene2SProtein(genes = fdr_GeneID, input_type = "gene_name")
@@ -464,7 +699,7 @@ SPdw_TCGA <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
 ```
 
 
-
+## Perform meta-analysis
 
 ```{r Perform meta analysis }
 L_fishercomb <- metaRNAseq(ind_deg = list(df_TCGA, df_GEO),
@@ -508,7 +743,9 @@ SPdw <- Gene2SProtein(genes = metacombDW_GeneID, input_type = "gene_name")
 #506 out of 5386 genes have a matching surface protein
 
 ```
-
+```{r check }
+SP$UniProt.gene
+```
 
 ## Plot the fraction on SPCG coding for receptor, enzymes, transporters etc.
 ```{r Almen classification }
@@ -521,59 +758,101 @@ Splot(SPup,
 #dev.off()
 ```
 
-
+## Perform the enrichment of UP & DOWN regulated genes in GEO and TCGA datasets
 
 ```{r Graphycally represent the enrichment}
-# barplot of the top 10 upregulated pathways in GEO
-#pdf("Enrichment_barplot_GEO_UP_filt.pdf", 10, 5)
-Enrichment_barplot(Enrich$GEO,
-                   enrich.databases <- c("GO_Biological_Process_2021"),
-                   p_adj = 0.05,
-                   num_term = 10,
-                   cond = "UP")
-#dev.off()
+
+
+SP_GEO_genes <- SP_GEO$UniProt.gene
+df_SP_GEO_genes <- df_GEO[rownames(df_GEO) %in% SP_GEO_genes, ]
+
+SP_TCGA_genes <- SP_TCGA$UniProt.gene
+df_SP_TCGA_genes <- df_TCGA[rownames(df_TCGA) %in% SP_TCGA_genes, ]
+
+head(df_SP_TCGA_genes)
+head(df_SP_GEO_genes)
+
+
+dfList <- list(TCGA = as.data.frame(df_SP_TCGA_genes), GEO = as.data.frame(df_SP_GEO_genes))
+
+Enrich <- Enrichment(dfList,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
 
 ```
+
+## graphically represent the enrichment of UP & DOWN regulated genes 
+## in GEO and TCGA datasets
 
 ```{r Graphycally represent the enrichment}
 # barplot of the top 10 upregulated pathways in TCGA
-#pdf("Enrichment_barplot_TCGA_UP_filt.pdf", 10, 5)
+library(enrichR)
+library(ggplot2)
+
+head(Enrich)
+
+SP_GEO_genes <- SP_GEO$UniProt.gene
+df_SP_GEO_genes <- df_GEO[rownames(df_GEO) %in% SP_GEO_genes, ]
+
+SP_TCGA_genes <- SP_TCGA$UniProt.gene
+df_SP_TCGA_genes <- df_TCGA[rownames(df_TCGA) %in% SP_TCGA_genes, ]
+
+head(df_SP_TCGA_genes)
+head(df_SP_GEO_genes)
+
+
+dfList <- list(TCGA = as.data.frame(df_SP_TCGA_genes), GEO = as.data.frame(df_SP_GEO_genes))
+
+Enrich <- Enrichment(dfList,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+
+pdf("Enrichment_barplot_TCGA_UP_filt.pdf", 10, 4)
 Enrichment_barplot(Enrich$TCGA,
                    enrich.databases <- c("GO_Biological_Process_2021"),
                    p_adj = 0.05,
                    num_term = 10,
                    cond = "UP")
-#dev.off()
-```
-```{r Graphycally represent the enrichment}
-#pdf("Enrichment_barplot_GEO_DW_filt.pdf", 10, 5)
-Enrichment_barplot(Enrich$GEO,
-                   enrich.databases <- c("GO_Biological_Process_2021"),
-                   p_adj = 0.05,
-                   num_term = 10,
-                   cond = "DOWN")
-#dev.off()
-```
+dev.off()
 
-
-```{r Graphycally represent the enrichment}
-#pdf("Enrichment_barplot_TCGA_DW_filt.pdf", 10, 5)
+pdf("Enrichment_barplot_TCGA_DW_filt.pdf", 10, 4)
 Enrichment_barplot(Enrich$TCGA,
                    enrich.databases <- c("GO_Biological_Process_2021"),
                    p_adj = 0.05,
                    num_term = 10,
                    cond = "DOWN")
-#dev.off()
+dev.off()
+
+
+pdf("Enrichment_barplot_GEO_UP_filt.pdf", 10, 4)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "UP")
+dev.off()
+
+
+pdf("Enrichment_barplot_GEO_DW_filt.pdf", 10, 4)
+Enrichment_barplot(Enrich$GEO,
+                   enrich.databases <- c("GO_Biological_Process_2021"),
+                   p_adj = 0.05,
+                   num_term = 10,
+                   cond = "DOWN")
+dev.off()
 ```
 
-## Perform venn diagram
+
+## Perform venn diagram of common SPCG in GEO and TCGA datasets
 
 ```{r Perform venn diagram }
 
 S_list <- list(SPup_GEO = rownames(SPup_GEO),
                SPup_TCGA = rownames(SPup_TCGA))
 
-#pdf("Venn_GEO_TCGA.pdf")
+#pdf("Venn_GEO_TCGA_filt.pdf")
 SVenn(S_list,
       cols.use = c("green", "blue"),
       opacity = 0.5,
@@ -583,4 +862,20 @@ SVenn(S_list,
 #save.image(file="cholangiocarcinoma.RData")
 ```
 
+## Perform venn diagram of common SPCG in GEO, TCGA datasets and SPCG found via meta-analysis
 
+```{r Perform venn diagram }
+
+S_list_meta <- list(SPup_GEO = rownames(SPup_GEO),
+               SPup_TCGA = rownames(SPup_TCGA),
+               Meta = SPup$UniProt.name)
+
+#pdf("Venn_GEO_TCGA_meta_filt.pdf")
+SVenn(S_list_meta,
+      cols.use = c("green", "blue","yellow"),
+      opacity = 0.5,
+      output_intersectionFile = FALSE)
+#dev.off()
+
+#save.image(file="cholangiocarcinoma.RData")
+```
