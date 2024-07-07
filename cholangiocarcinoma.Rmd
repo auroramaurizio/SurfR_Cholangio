@@ -1,14 +1,6 @@
 ---
-  title: "SurfR cholangiocarcinoma public datasets analysis"
+title: "SurfR cholangiocarcinoma public datasets analysis"
 author: "Aurora Maurizio, Anna Sofia Tascini, and Marco Jacopo Morelli"
-output:
-  BiocStyle::html_document:
-  toc_float: true
-bibliography: references.bib
-vignette: >
-  %\VignetteIndexEntry{Introduction to SurfR}
-%\VignetteEngine{knitr::rmarkdown}
-%\VignetteEncoding{UTF-8}
 ---
 
   
