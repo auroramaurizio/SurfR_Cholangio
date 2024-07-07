@@ -213,7 +213,7 @@ SPdw_TCGA <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
 #354 out of 4145 genes have a matching surface protein
 # if we apply filter df_GEO$Mean_CPM_C < 0.5: 0
 
-write.xlsx(SPup_TCGA, "Supp_table_S1_TCGA.xlsx")
+write.xlsx(SPup_TCGA, "Supp_table_S2_TCGA.xlsx")
 
 ```
 
