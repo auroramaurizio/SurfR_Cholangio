@@ -213,9 +213,10 @@ SPdw_TCGA <- Gene2SProtein(genes = fdrDW_GeneID, input_type = "gene_name")
 #354 out of 4145 genes have a matching surface protein
 # if we apply filter df_GEO$Mean_CPM_C < 0.5: 0
 
-write.xlsx(SPup_TCGA, "Supp_table_S2_TCGA.xlsx")
+write.xlsx(SPup_TCGA, "Supp_table_S1_TCGA.xlsx")
 
 ```
+
 
 ## Perform the enrichment to carachterize UP and DOWN regulated genes in GEO and TCGA datasets
 
@@ -287,7 +288,6 @@ Enrichment_barplot(Enrich$GEO,
 ## on the TCGA dataset before filtering (Fig. 1D)
 
 ```{r check }
-library(enrichR)
 
 SP_TCGA_genes <- SP_TCGA$UniProt.gene
 NSP_TCGA_genes <- df_TCGA$GeneID[!df_TCGA$GeneID %in% SP_TCGA_genes] 
@@ -334,6 +334,13 @@ Enrich_TCGA_BP$SP_TCGA$fdr_up$GO_Biological_Process_2021$Term <- gsub(
   "Ca-dep. cell-cell adh. via p-m adh. mol.",
   Enrich_TCGA_BP$SP_TCGA$fdr_up$GO_Biological_Process_2021$Term
 )
+
+# biological process
+
+SPvs_nSP_UP_TCGA_BP <- Enrichment_barplot(Enrich_TCGA_BP$SP_TCGA,
+                                           enrich.databases <- c("GO_Biological_Process_2021"),
+                                           p_adj = 0.05,
+                                           num_term = 10)
 
 #pdf("Enrich_SPvs_nSP_UP_TCGA_BP_new.pdf",5.5,2)
 print(SPvs_nSP_UP_TCGA_BP +ggtitle("SP - TCGA BP")+ 
@@ -391,10 +398,58 @@ print(SPvs_nSP_DOWN_TCGA_BP +ggtitle("nSP - TCGA BP")+
         ) )
 #dev.off()
 ```
-# SP vs non surface proteins in the GEO dataset before filtering
+
+# ML only predicted SP in the TCGA dataset - enrichment
 
 ```{r }
+library(enrichR)
 
+ML_SPup_TCGA <- SPup_TCGA[grepl("machine learning", SPup_TCGA$Surfaceome.Label.Source),]
+ML_SPup_TCGA <- ML_SPup_TCGA$UniProt.gene
+df_SP_TCGA_genes_ML <- df_TCGA[rownames(df_TCGA) %in% ML_SPup_TCGA, ]
+df_SP_TCGA_genes_ML <- list(SP_TCGA_ML = as.data.frame(df_SP_TCGA_genes_ML)) 
+
+Enrich_TCGA_BP_ML <- Enrichment(df_SP_TCGA_genes_ML,
+                     enrich.databases = c("GO_Biological_Process_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+
+Enrich_TCGA_BP_ML_P <- Enrichment_barplot(Enrich_TCGA_BP_ML$SP_TCGA_ML,
+                                           enrich.databases <- c("GO_Biological_Process_2021"),
+                                           p_adj = 0.05,
+                                           num_term = 10)
+
+
+print(Enrich_TCGA_BP_ML_P +ggtitle("SP - TCGA BP ML")+ 
+        theme(
+          legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 6)   
+        ) )
+
+
+Enrich_TCGA_CC_ML <- Enrichment(df_SP_TCGA_genes_ML,
+                     enrich.databases = c("GO_Cellular_Component_2021"),
+                     p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+Enrich_TCGA_CC_ML_P <- Enrichment_barplot(Enrich_TCGA_CC_ML$SP_TCGA_ML,
+                                           enrich.databases <- c("GO_Cellular_Component_2021"),
+                                           p_adj = 0.05,
+                                           num_term = 10)
+
+
+print(Enrich_TCGA_CC_ML_P +ggtitle("SP - TCGA CC ML")+ 
+        theme(
+          legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 6)   
+        ) )
+
+
+
+```
+
+
+```{r }
 SP_GEO_genes <- SP_GEO$UniProt.gene
 NSP_GEO_genes <- df_GEO$GeneID[!df_GEO$GeneID %in% SP_GEO_genes] 
 
@@ -517,6 +572,56 @@ print(SPvs_nSP_DOWN_GEO_BP +ggtitle("nSP - GEO BP")+
 #dev.off()
 
 ```
+
+# ML only predicted SP in the GEO dataset - enrichment
+
+```{r }
+library(enrichR)
+
+ML_SPup_GEO <- SPup_GEO[grepl("machine learning", SPup_GEO$Surfaceome.Label.Source),]
+ML_SPup_GEO <- ML_SPup_GEO$UniProt.gene
+df_SP_GEO_genes_ML <- df_GEO[rownames(df_GEO) %in% ML_SPup_GEO, ]
+df_SP_GEO_genes_ML <- list(SP_GEO_ML = as.data.frame(df_SP_GEO_genes_ML)) 
+
+Enrich_GEO_BP_ML <- Enrichment(df_SP_GEO_genes_ML,
+                                enrich.databases = c("GO_Biological_Process_2021"),
+                                p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+
+
+Enrich_GEO_BP_ML_P <- Enrichment_barplot(Enrich_GEO_BP_ML$SP_GEO_ML,
+                                          enrich.databases <- c("GO_Biological_Process_2021"),
+                                          p_adj = 0.05,
+                                          num_term = 10)
+
+
+print(Enrich_GEO_BP_ML_P +ggtitle("SP - GEO BP ML")+ 
+        theme(
+          legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 6)   
+        ) )
+
+
+Enrich_GEO_CC_ML <- Enrichment(df_SP_GEO_genes_ML,
+                                enrich.databases = c("GO_Cellular_Component_2021"),
+                                p_adj = 0.05, logFC = 1, save.results = TRUE)
+
+Enrich_GEO_CC_ML_P <- Enrichment_barplot(Enrich_GEO_CC_ML$SP_GEO_ML,
+                                          enrich.databases <- c("GO_Cellular_Component_2021"),
+                                          p_adj = 0.05,
+                                          num_term = 10)
+
+
+print(Enrich_GEO_CC_ML_P +ggtitle("SP - GEO CC ML")+ 
+        theme(
+          legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 6)   
+        ) )
+
+
+
+```
+
 # Fig. S3 A,B Cellular Component and Molecular Function nSP TCGA
 
 ```{r TCGA CC, MF }
