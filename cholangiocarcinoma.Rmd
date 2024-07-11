@@ -1083,3 +1083,19 @@ getwd()
 
 #save.image(file="cholangiocarcinoma.RData")
 ```
+
+```{r describe the SPCG }
+library(enrichR)
+ 
+filteredDGE <- df_GEO[df_GEO$GeneID %in% SPup$GeneID,]
+annotated_SPup_Jensen_DISEASES <- Annotate_SPID(filteredDGE, c("Jensen_DISEASES")) # carcinoma
+ 
+annotated_SPup_DSigDB <- Annotate_SPID(filteredDGE, c("DSigDB"))
+annotated_SPup_IDG <- Annotate_SPID(filteredDGE, c("IDG_Drug_Targets_2022"))
+annotated_SPup_LINCS <- Annotate_SPID(filteredDGE, c("LINCS_L1000_Chem_Pert_Consensus_Sigs"))
+head(annotated_SPup_LINCS)
+list_df = list(annotated_SPup_Jensen_DISEASES, annotated_SPup_DSigDB, annotated_SPup_LINCS, annotated_SPup_IDG)
+names(list_df) <- c("Jensen_DISEASES", "DSigDB", "LINCS_L1000_Chem_Pert", "IDG_Drug_Targets_2022")
+ 
+write.xlsx(list_df, "Supp_table_S3_Annotate_SPID.xlsx")
+```
