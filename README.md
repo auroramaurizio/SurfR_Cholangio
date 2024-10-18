@@ -1,9 +1,11 @@
 <img src="Pictures/SurfR_logo.png" alt="alt text" width="100" height="120">
 
-# SurfR Cholangiocarcinoma
+# SurfR applications:
+# Cholangiocarcinoma
+
 ## SurfR Bioconductor package cancer use case R code.
 
-### bulk RNA-Seq Re-analysis of:
+### Bulk RNA-Seq re-analysis of:
 - GSE107943 dataset
 - TCGA.CHOL dataset
 
