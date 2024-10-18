@@ -3,8 +3,8 @@
 # SurfR Cholangiocarcinoma
 ## SurfR Bioconductor package cancer use case R code.
 
-### Re-analysis of:
-- GSE107943 bulk RNA-Seq dataset
+### bulk RNA-Seq Re-analysis of:
+- GSE107943 dataset
 - TCGA.CHOL dataset
 
 ### References
