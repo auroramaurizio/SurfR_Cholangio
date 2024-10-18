@@ -3,7 +3,7 @@
 # _SurfR applications_
 # Cancer: cholangiocarcinoma
 
-## SurfR Bioconductor package use-case R code.
+## [SurfR](https://www.bioconductor.org/packages/release/bioc/html/SurfR.html) Bioconductor package use-case R code.
 
 ### Bulk RNA-Seq re-analysis of:
 - GSE107943 dataset
